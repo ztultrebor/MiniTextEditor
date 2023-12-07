@@ -49,6 +49,7 @@
 (check-expect (edit (make-words "Hello" CURSOR-ON "") "right") (make-words "Hello" CURSOR-ON ""))
 (check-expect (edit (make-words "Hell" CURSOR-ON "o world!") "\b") (make-words "Hel" CURSOR-ON "o world!"))
 (check-expect (edit (make-words "" CURSOR-ON "Hello") "\b") (make-words "" CURSOR-ON "Hello"))
+(check-expect (edit (make-words "Why " CURSOR-ON "hello") "\r") (make-words "Why " CURSOR-ON "hello"))
 (check-expect (edit (make-words "Hell" CURSOR-ON "o world!") "a") (make-words "Hella" CURSOR-ON "o world!"))
 (check-expect (edit (make-words "Hell" CURSOR-ON "o world!") "shift") (make-words "Hell" CURSOR-ON "o world!"))
 (define (edit process ke)
@@ -58,7 +59,7 @@
            (> (string-length (words-prefix process)) 0))
       (substring (words-prefix process)
                  0 (- (string-length (words-prefix process)) 1))]
-     [(key=? "\b" ke) (words-prefix process)]
+     [(or (key=? "\b" ke) (key=? "\r" ke) (key=? "\t" ke)) (words-prefix process)]
      [(and (key=? "right" ke)  (> (string-length (words-suffix process)) 0))
       (string-append (words-prefix process)
                      (string-ith (words-suffix process) 0))]
