@@ -15,7 +15,8 @@
 
 ; constants
 
-(define WINDOW (empty-scene 400 20))
+(define WINDOWWIDTH 400)
+(define WINDOW (empty-scene WINDOWWIDTH 20))
 (define CURSOR-ON (rectangle 1 16 "solid" "black"))
 (define CURSOR-OFF (rectangle 1 16 "solid" "white"))
 
@@ -32,13 +33,18 @@
     )
   )
 
+
+; Words -> Img
+; prepare the text under edit for display
+(define (text-display process)
+  (beside (text (words-prefix process) 12 "black")
+          (words-cursor process)
+          (text (words-suffix process) 12 "black")))
+
 ; Words -> Img
 ; display the text editor window
 (define (text-editor process)
-  (place-image/align (beside (text (words-prefix process)12 "black")
-                             (words-cursor process)
-                             (text (words-suffix process) 12 "black"))
-                     5 10 "left" "center" WINDOW))
+  (place-image/align (text-display process) 5 10 "left" "center" WINDOW))
 
 ; Words KeyEvent -> Words
 ; edit text with keystrokes
@@ -52,6 +58,8 @@
 (check-expect (edit (make-words "Why " CURSOR-ON "hello") "\r") (make-words "Why " CURSOR-ON "hello"))
 (check-expect (edit (make-words "Hell" CURSOR-ON "o world!") "a") (make-words "Hella" CURSOR-ON "o world!"))
 (check-expect (edit (make-words "Hell" CURSOR-ON "o world!") "shift") (make-words "Hell" CURSOR-ON "o world!"))
+(check-expect (edit (make-words "It was the best of times; it was the worst of times. Or summat. Uh-huh-huh" CURSOR-ON "") "l") (make-words  "It was the best of times; it was the worst of times. Or summat. Uh-huh-huh" CURSOR-ON ""))
+(check-expect (edit (make-words "It was the best of times; it was the worst of times. Or summat. Uh-huh-hu" CURSOR-ON "") "h") (make-words  "It was the best of times; it was the worst of times. Or summat. Uh-huh-huh" CURSOR-ON ""))
 (define (edit process ke)
   (make-words
    (cond
@@ -63,7 +71,9 @@
      [(and (key=? "right" ke)  (> (string-length (words-suffix process)) 0))
       (string-append (words-prefix process)
                      (string-ith (words-suffix process) 0))]
-     [(= (string-length ke) 1) (string-append (words-prefix process) ke)]
+     [(and (= (string-length ke) 1)
+           (< (image-width (text-display process)) (- WINDOWWIDTH 10)))
+           (string-append (words-prefix process) ke)]
      [else (words-prefix process)])
    (words-cursor process)
    (cond
