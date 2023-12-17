@@ -67,8 +67,12 @@
 
 (define WINDOWWIDTH 400)
 (define WINDOW (empty-scene WINDOWWIDTH 20))
-(define CURSOR-ON (rectangle 1 16 "solid" "black"))
-(define CURSOR-OFF (rectangle 1 16 "solid" "white"))
+(define CURSORWIDTH 1)
+(define CURSORHEIGHT 16)
+(define TEXTSIZE 12)
+(define TEXTCOLOR "black")
+(define CURSOR-ON (rectangle CURSORWIDTH CURSORHEIGHT "solid" TEXTCOLOR))
+(define CURSOR-OFF (rectangle CURSORWIDTH CURSORHEIGHT "solid" "white"))
 (define INITIALSTATUS (make-text-editor '() CURSOR-ON '()))
 
 
@@ -80,7 +84,7 @@
   ; launches the program from some initial state 
   (big-bang txt-ed
     [on-key edit]
-    [to-draw editor-GUI]
+    [to-draw render]
     [on-tick flash-cursor 1/2]))
 
 
@@ -89,8 +93,8 @@
   ; edit text with keystrokes
   (cond
     [(key=? "\b" ke) (delete-text txt-ed)]
-    [(key=? "left" ke) (move-left txt-ed)]
-    [(key=? "right" ke) (move-right txt-ed)]
+    [(key=? "left" ke) (cursor-left txt-ed)]
+    [(key=? "right" ke) (cursor-right txt-ed)]
     [(key=? "\r" ke) txt-ed]
     [(key=? "\t" ke) txt-ed]
     [(key=? "shift" ke) txt-ed]
@@ -99,24 +103,25 @@
     [else (insert-text txt-ed ke)]))
 
 
+(define (render txt-ed)
 ; TextEditor -> Img
 ; display the text editor window
-(define (editor-GUI txt)
   (place-image/align
-   (beside (text (reverse-implode (text-editor-prefix txt) "") 12 "black")
-           (text-editor-cursor txt)
-           (text (implode (text-editor-suffix txt)) 12 "black"))
+   (beside
+    (string->image (reverse-implode (text-editor-prefix txt-ed) ""))
+    (text-editor-cursor txt-ed)
+    (string->image (implode (text-editor-suffix txt-ed))))
    5 10 "left" "center" WINDOW))
 
 
-; TextEditor -> TextEditor
-; flash cursor
-(define (flash-cursor txt)
-  (make-text-editor (text-editor-prefix txt)
-                    (cond [(equal? CURSOR-ON (text-editor-cursor txt))
+(define (flash-cursor txt-ed)
+  ; TextEditor -> TextEditor
+  ; flash cursor
+  (make-text-editor (text-editor-prefix txt-ed)
+                    (cond [(equal? CURSOR-ON (text-editor-cursor txt-ed))
                            CURSOR-OFF]
                           [else CURSOR-ON])
-                    (text-editor-suffix txt)))
+                    (text-editor-suffix txt-ed)))
 
 
 (define (insert-text txt-ed ke)
@@ -150,7 +155,7 @@
               (make-text-editor (cons "p" '()) CURSOR-ON '()))
 
 
-(define (move-left txt-ed)
+(define (cursor-left txt-ed)
   ; TextEditor -> TextEditor
   ; move cursor one character to the left
   (cond
@@ -161,14 +166,14 @@
            (cons (first (text-editor-prefix txt-ed))
                  (text-editor-suffix txt-ed)))]))
 ; checks
-(check-expect (move-left (make-text-editor '() CURSOR-ON (cons "p" '())))
+(check-expect (cursor-left (make-text-editor '() CURSOR-ON (cons "p" '())))
               (make-text-editor '() CURSOR-ON (cons "p" '())))
-(check-expect (move-left (make-text-editor (cons "r" (cons "p" '()))
-                                           CURSOR-ON '()))
+(check-expect (cursor-left (make-text-editor (cons "r" (cons "p" '()))
+                                             CURSOR-ON '()))
               (make-text-editor (cons "p" '()) CURSOR-ON (cons "r" '())))
 
 
-(define (move-right txt-ed)
+(define (cursor-right txt-ed)
   ; TextEditor -> TextEditor
   ; move cursor one character to the left
   (cond
@@ -179,10 +184,10 @@
            (text-editor-cursor txt-ed)
            (rest (text-editor-suffix txt-ed)))]))
 ; checks
-(check-expect (move-right (make-text-editor '() CURSOR-ON '()))
+(check-expect (cursor-right (make-text-editor '() CURSOR-ON '()))
               (make-text-editor '() CURSOR-ON '()))
-(check-expect (move-right (make-text-editor (cons "p" '())
-                                            CURSOR-ON (cons "t" '())))
+(check-expect (cursor-right (make-text-editor (cons "p" '())
+                                              CURSOR-ON (cons "t" '())))
               (make-text-editor (cons "t" (cons "p" '())) CURSOR-ON '()))
 
 
@@ -194,6 +199,10 @@
     [else (reverse-implode (rest lo1s-from)
                            (string-append (first lo1s-from) string-to))]))
 
+(define (string->image s)
+  ;; String -> Image
+  ;; converts a string into a text image
+  (text s TEXTSIZE TEXTCOLOR))
 
 ; actions
 
