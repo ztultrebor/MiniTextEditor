@@ -6,11 +6,61 @@
 
 ; data definitions
 
-; A Words is a structure:
-;   (make-text String Img String).
+
+; A 1String is a string of length 1
+(define (1string? s)
+  (and (string? s) (= (string-length s) 1)))
+; checks
+(check-expect (1string? "a") #t)
+(check-expect (1string? "ab") #f)
+(check-expect (1string? 7) #f)
+(check-expect (1string? (cons "a" '())) #f)
+#;
+(define (fn-on-1string ch)
+  (cond
+    [(not (1string? ch)) (error "not a 1string")]
+    [else ... ch]))
+
+
+; A ListOf1String is one of:
+;    - '()
+;    - cons (String ListOfString)
+(define (list-of-1string? lo1s)
+  (and
+   (list? lo1s)
+   (or
+    (empty? lo1s)
+    (and
+     (1string? (first lo1s))
+     (list-of-1string? (rest lo1s))))))
+; checks
+(check-expect (list-of-1string? '()) #t)
+(check-expect (list-of-1string? "a") #f)
+(check-expect (list-of-1string? 7) #f)
+(check-expect (list-of-1string? (cons "k" (cons "a" '()))) #t)
+(check-expect (list-of-1string? (cons "k" (cons 7 '()))) #f)            
+#;
+(define (fn-on-list-of-1string lo1s)
+  (cond
+    [(not (list-of-1string? lo1s)) (error "not a list of 1strings")]
+    [(empty? lo1s) ...]
+    [else ... (fn-on-1string (first lo1s)) ...
+          (fn-on-1string (fn-on-list-of-1string (rest lo1s)))]))
+ 
+ 
+; A TextEditor is a structure:
+;   (make-text ListOf1String Img ListOf1String).
 ; as used in a text editor, the prefix and suffix of text are determined by the
 ;   location of the cursor
-(define-struct words [prefix cursor suffix])
+(define-struct text-editor [prefix cursor suffix])
+#;
+(define (fn-on-text-editor txt-ed)
+  (cond
+    [(not (text-editor? txt-ed)) (error "not a text editor")]
+    [else ... (fn-on-list-of-1string (text-editor-prefix txt-ed))
+          ... (text-editor-cursor txt-ed)
+          ...  (fn-on-list-of-1string (text-editor-suffix txt-ed))]))
+
 
 
 ; constants
@@ -19,81 +69,132 @@
 (define WINDOW (empty-scene WINDOWWIDTH 20))
 (define CURSOR-ON (rectangle 1 16 "solid" "black"))
 (define CURSOR-OFF (rectangle 1 16 "solid" "white"))
+(define INITIALSTATUS (make-text-editor '() CURSOR-ON '()))
+
 
 
 ; functions
 
-; Words -> Words
-; launches the program from some initial state 
-(define (main txt)
-  (big-bang txt
-    [to-draw text-editor]
+(define (main txt-ed)
+  ; TextEditor -> TextEditor
+  ; launches the program from some initial state 
+  (big-bang txt-ed
     [on-key edit]
-    [on-tick flash-cursor 1/2]
-    )
-  )
+    [to-draw editor-GUI]
+    [on-tick flash-cursor 1/2]))
 
 
-; Words -> Img
-; prepare the text under edit for display
-(define (text-display process)
-  (beside (text (words-prefix process) 12 "black")
-          (words-cursor process)
-          (text (words-suffix process) 12 "black")))
+(define (edit txt-ed ke)
+  ; TextEditor KeyEvent -> TextEditor
+  ; edit text with keystrokes
+  (cond
+    [(key=? "\b" ke) (delete-text txt-ed)]
+    [(key=? "left" ke) (move-left txt-ed)]
+    [(key=? "right" ke) (move-right txt-ed)]
+    [(key=? "\r" ke) txt-ed]
+    [(key=? "\t" ke) txt-ed]
+    [(key=? "shift" ke) txt-ed]
+    [(key=? "rshift" ke) txt-ed]
+    [(> (length (text-editor-prefix txt-ed)) 42) txt-ed]
+    [else (insert-text txt-ed ke)]))
 
-; Words -> Img
+
+; TextEditor -> Img
 ; display the text editor window
-(define (text-editor process)
-  (place-image/align (text-display process) 5 10 "left" "center" WINDOW))
+(define (editor-GUI txt)
+  (place-image/align
+   (beside (text (reverse-implode (text-editor-prefix txt) "") 12 "black")
+           (text-editor-cursor txt)
+           (text (implode (text-editor-suffix txt)) 12 "black"))
+   5 10 "left" "center" WINDOW))
 
-; Words KeyEvent -> Words
-; edit text with keystrokes
-(check-expect (edit (make-words "Hello" CURSOR-ON "") "left") (make-words "Hell" CURSOR-ON "o"))
-(check-expect (edit (make-words "Hell" CURSOR-ON "o world!") "left") (make-words "Hel" CURSOR-ON "lo world!"))
-(check-expect (edit (make-words "" CURSOR-ON "Hello") "left") (make-words "" CURSOR-ON "Hello"))
-(check-expect (edit (make-words "Hell" CURSOR-ON "o world!") "right") (make-words "Hello" CURSOR-ON " world!"))
-(check-expect (edit (make-words "Hello" CURSOR-ON "") "right") (make-words "Hello" CURSOR-ON ""))
-(check-expect (edit (make-words "Hell" CURSOR-ON "o world!") "\b") (make-words "Hel" CURSOR-ON "o world!"))
-(check-expect (edit (make-words "" CURSOR-ON "Hello") "\b") (make-words "" CURSOR-ON "Hello"))
-(check-expect (edit (make-words "Why " CURSOR-ON "hello") "\r") (make-words "Why " CURSOR-ON "hello"))
-(check-expect (edit (make-words "Hell" CURSOR-ON "o world!") "a") (make-words "Hella" CURSOR-ON "o world!"))
-(check-expect (edit (make-words "Hell" CURSOR-ON "o world!") "shift") (make-words "Hell" CURSOR-ON "o world!"))
-(check-expect (edit (make-words "It was the best of times; it was the worst of times. Or summat. Uh-huh-huh" CURSOR-ON "") "l") (make-words  "It was the best of times; it was the worst of times. Or summat. Uh-huh-huh" CURSOR-ON ""))
-(check-expect (edit (make-words "It was the best of times; it was the worst of times. Or summat. Uh-huh-hu" CURSOR-ON "") "h") (make-words  "It was the best of times; it was the worst of times. Or summat. Uh-huh-huh" CURSOR-ON ""))
-(define (edit process ke)
-  (make-words
-   (cond
-     [(and (or (key=? "\b" ke) (key=? "left" ke))
-           (> (string-length (words-prefix process)) 0))
-      (substring (words-prefix process)
-                 0 (- (string-length (words-prefix process)) 1))]
-     [(or (key=? "\b" ke) (key=? "\r" ke) (key=? "\t" ke)) (words-prefix process)]
-     [(and (key=? "right" ke)  (> (string-length (words-suffix process)) 0))
-      (string-append (words-prefix process)
-                     (string-ith (words-suffix process) 0))]
-     [(and (= (string-length ke) 1)
-           (< (image-width (text-display process)) (- WINDOWWIDTH 10)))
-           (string-append (words-prefix process) ke)]
-     [else (words-prefix process)])
-   (words-cursor process)
-   (cond
-     [(and (key=? "left" ke) (> (string-length (words-prefix process)) 0))
-      (string-append (string-ith (words-prefix process)
-                                 (- (string-length (words-prefix process)) 1))
-                     (words-suffix process))]
-     [(and (key=? "right" ke) (> (string-length (words-suffix process)) 0))
-      (substring (words-suffix process) 1)]
-     [else (words-suffix process)])))
 
-; Words -> Words
+; TextEditor -> TextEditor
 ; flash cursor
-(define (flash-cursor process)
-  (make-words (words-prefix process)
-              (cond [(equal? CURSOR-ON (words-cursor process)) CURSOR-OFF]
-                    [else CURSOR-ON])
-              (words-suffix process)))
+(define (flash-cursor txt)
+  (make-text-editor (text-editor-prefix txt)
+                    (cond [(equal? CURSOR-ON (text-editor-cursor txt))
+                           CURSOR-OFF]
+                          [else CURSOR-ON])
+                    (text-editor-suffix txt)))
+
+
+(define (insert-text txt-ed ke)
+  ; TextEditor KeyEvent -> TextEditor
+  ; type text with keystrokes
+  (make-text-editor
+   (cons ke (text-editor-prefix txt-ed))
+   (text-editor-cursor txt-ed)
+   (text-editor-suffix txt-ed)))
+; checks
+(check-expect (insert-text (make-text-editor '() CURSOR-ON '()) "p")
+              (make-text-editor (cons "p" '()) CURSOR-ON '()))
+(check-expect (insert-text (make-text-editor (cons "p" '()) CURSOR-ON '()) "r")
+              (make-text-editor (cons "r" (cons "p" '())) CURSOR-ON '()))
+
+
+(define (delete-text txt-ed)
+  ; TextEditor -> TextEditor
+  ; delete one character of text
+  (cond
+    [(empty? (text-editor-prefix txt-ed)) txt-ed]
+    [else (make-text-editor
+           (rest (text-editor-prefix txt-ed))
+           (text-editor-cursor txt-ed)
+           (text-editor-suffix txt-ed))]))
+; checks
+(check-expect (delete-text (make-text-editor '() CURSOR-ON '()))
+              (make-text-editor '() CURSOR-ON '()))
+(check-expect (delete-text (make-text-editor (cons "r" (cons "p" '()))
+                                             CURSOR-ON '()))
+              (make-text-editor (cons "p" '()) CURSOR-ON '()))
+
+
+(define (move-left txt-ed)
+  ; TextEditor -> TextEditor
+  ; move cursor one character to the left
+  (cond
+    [(empty? (text-editor-prefix txt-ed)) txt-ed]
+    [else (make-text-editor
+           (rest (text-editor-prefix txt-ed))
+           (text-editor-cursor txt-ed)
+           (cons (first (text-editor-prefix txt-ed))
+                 (text-editor-suffix txt-ed)))]))
+; checks
+(check-expect (move-left (make-text-editor '() CURSOR-ON (cons "p" '())))
+              (make-text-editor '() CURSOR-ON (cons "p" '())))
+(check-expect (move-left (make-text-editor (cons "r" (cons "p" '()))
+                                           CURSOR-ON '()))
+              (make-text-editor (cons "p" '()) CURSOR-ON (cons "r" '())))
+
+
+(define (move-right txt-ed)
+  ; TextEditor -> TextEditor
+  ; move cursor one character to the left
+  (cond
+    [(empty? (text-editor-suffix txt-ed)) txt-ed]
+    [else (make-text-editor
+           (cons (first (text-editor-suffix txt-ed))
+                 (text-editor-prefix txt-ed))
+           (text-editor-cursor txt-ed)
+           (rest (text-editor-suffix txt-ed)))]))
+; checks
+(check-expect (move-right (make-text-editor '() CURSOR-ON '()))
+              (make-text-editor '() CURSOR-ON '()))
+(check-expect (move-right (make-text-editor (cons "p" '())
+                                            CURSOR-ON (cons "t" '())))
+              (make-text-editor (cons "t" (cons "p" '())) CURSOR-ON '()))
+
+
+(define (reverse-implode lo1s-from string-to)
+  ;; ListOf1Strings String -> String
+  ;; implode the list in reverse
+  (cond
+    [(empty? lo1s-from) string-to]
+    [else (reverse-implode (rest lo1s-from)
+                           (string-append (first lo1s-from) string-to))]))
 
 
 ; actions
 
-(main (make-words "" CURSOR-ON ""))
+(main INITIALSTATUS)
