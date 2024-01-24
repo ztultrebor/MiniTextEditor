@@ -1,6 +1,6 @@
 ;; The first three lines of this file were inserted by DrRacket. They record metadata
 ;; about the language level of this file in a form that our tools can easily process.
-#reader(lib "htdp-beginner-reader.ss" "lang")((modname texteditor) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname texteditor) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
 (require 2htdp/image)
 (require 2htdp/universe)
 
@@ -84,6 +84,7 @@
   ; launches the program from some initial state 
   (big-bang txt-ed
     [on-key edit]
+    [on-mouse split-structural]
     [to-draw render]
     [on-tick flash-cursor 1/2]))
 
@@ -103,9 +104,35 @@
     [else (insert-text txt-ed ke)]))
 
 
+(define (split-structural txt-ed x y me)
+  ; [ListOf 1String] N -> TextEditor
+  (local ((define (split txt-ed x)
+            (local ((define prefix (text-editor-prefix txt-ed))
+                    (define suffix (text-editor-suffix txt-ed))
+                    (define cursor (text-editor-cursor txt-ed))
+                    (define locursor (image-width (string->image (implode prefix)))))
+              ; - IN -
+              (cond
+                [(and (> x locursor) (empty? suffix)) txt-ed]
+                [(> x locursor)
+                 (split (make-text-editor (cons (first suffix) prefix)
+                                          cursor
+                                          (rest suffix)) x)]
+                [(<= (image-width (string->image (implode (rest prefix)))) x locursor)
+                 (make-text-editor (rest prefix)
+                                   cursor
+                                   (cons (first prefix) suffix))]
+                [else
+                 (split (make-text-editor (rest prefix)
+                                          cursor
+                                          (cons (first prefix) suffix)) x)]))))
+    ; - IN -
+    (if (mouse=? me "button-down") (split txt-ed x) txt-ed)))
+
+
 (define (render txt-ed)
-; TextEditor -> Img
-; display the text editor window
+  ; TextEditor -> Img
+  ; display the text editor window
   (place-image/align
    (beside
     (string->image (reverse-implode (text-editor-prefix txt-ed) ""))
@@ -199,10 +226,13 @@
     [else (reverse-implode (rest lo1s-from)
                            (string-append (first lo1s-from) string-to))]))
 
+
 (define (string->image s)
   ;; String -> Image
   ;; converts a string into a text image
   (text s TEXTSIZE TEXTCOLOR))
+
+
 
 ; actions
 
